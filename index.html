@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jogo de Xadrez</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f0f0f0;
+    }
+    #board {
+      margin: 20px;
+    }
+    #status {
+      margin-top: 10px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    #controls {
+      margin-top: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h1>Jogo de Xadrez</h1>
+  <div id="board" style="width: 400px;"></div>
+  <div id="status">Sua vez de jogar!</div>
+  <div id="controls">
+    <button onclick="resetGame()">Reiniciar Jogo</button>
+  </div>
+  <script>
+    const boardElement = document.getElementById('board');
+    const statusElement = document.getElementById('status');
+    const chess = new Chess();
+    let board = null;
+    let stockfish = null;
+
+    // Inicializa o tabuleiro
+    function initBoard() {
+      board = Chessboard(boardElement, {
+        draggable: true,
+        position: 'start',
+        onDrop: handleMove,
+      });
+    }
+
+    // Função para lidar com movimentos do jogador
+    function handleMove(source, target) {
+      const move = chess.move({ from: source, to: target, promotion: 'q' });
+
+      if (move === null) {
+        return 'snapback';
+      }
+
+      updateStatus();
+
+      // Turno da máquina
+      if (!chess.game_over()) {
+        setTimeout(makeComputerMove, 250);
+      }
+    }
+
+    // Atualiza o status do jogo
+    function updateStatus() {
+      if (chess.in_checkmate()) {
+        statusElement.textContent = 'Xeque-mate! Fim de jogo.';
+      } else if (chess.in_draw()) {
+        statusElement.textContent = 'Empate!';
+      } else {
+        statusElement.textContent = chess.turn() === 'w'
+          ? 'Sua vez de jogar!'
+          : 'Vez da máquina...';
+      }
+    }
+
+    // Movimento da máquina usando Stockfish
+    function makeComputerMove() {
+      stockfish.postMessage(`position fen ${chess.fen()}`);
+      stockfish.postMessage('go depth 15');
+    }
+
+    // Recebe o movimento do Stockfish
+    function onStockfishMessage(event) {
+      const message = event.data;
+
+      if (message.startsWith('bestmove')) {
+        const move = message.split(' ')[1];
+        chess.move({ from: move.substring(0, 2), to: move.substring(2, 4), promotion: 'q' });
+
+        board.position(chess.fen());
+        updateStatus();
+      }
+    }
+
+    // Reinicia o jogo
+    function resetGame() {
+      chess.reset();
+      board.start();
+      updateStatus();
+    }
+
+    // Inicializa o Stockfish
+    function initStockfish() {
+      stockfish = new Worker('https://cdn.jsdelivr.net/gh/nmrugg/stockfish.js/stockfish.js');
+      stockfish.onmessage = onStockfishMessage;
+    }
+
+    // Inicializa tudo
+    function init() {
+      initBoard();
+      initStockfish();
+      updateStatus();
+    }
+
+    init();
+  </script>
+</body>
+</html>
